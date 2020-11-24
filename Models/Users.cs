@@ -42,6 +42,7 @@ namespace CatjiApi.Models
         public string Signature { get; set; }
         public int FollowerNum { get; set; }
         public int? CatId { get; set; }
+        public DateTime ChangedTime { get; set; }
 
         public Cat CatNavigation { get; set; }
         public ICollection<Block> BlockBlockUs { get; set; }

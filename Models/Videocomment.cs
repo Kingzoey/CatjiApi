@@ -7,6 +7,7 @@ namespace CatjiApi.Models
     {
         public Videocomment()
         {
+            InverseParentVc = new HashSet<Videocomment>();
             InverseReplyVc = new HashSet<Videocomment>();
             Likevideocomment = new HashSet<Likevideocomment>();
         }
@@ -18,10 +19,13 @@ namespace CatjiApi.Models
         public int? ReplyVcid { get; set; }
         public DateTime CreateTime { get; set; }
         public int LikeNum { get; set; }
+        public int? ParentVcid { get; set; }
 
+        public Videocomment ParentVc { get; set; }
         public Videocomment ReplyVc { get; set; }
         public Users Us { get; set; }
         public Video V { get; set; }
+        public ICollection<Videocomment> InverseParentVc { get; set; }
         public ICollection<Videocomment> InverseReplyVc { get; set; }
         public ICollection<Likevideocomment> Likevideocomment { get; set; }
     }

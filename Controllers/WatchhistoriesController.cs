@@ -6,6 +6,8 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CatjiApi.Models;
+using Microsoft.AspNetCore.Authentication;
+using System.Security.Claims;
 
 namespace CatjiApi.Controllers
 {
@@ -18,6 +20,74 @@ namespace CatjiApi.Controllers
         public WatchhistoriesController(ModelContext context)
         {
             _context = context;
+        }
+
+        [HttpGet("info")]
+        public async Task<IActionResult> GetWatchInfo(int usid, int offset)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { status = "invalid", data = ModelState });
+            }
+
+            var videos = _context.Watchhistory.Where(x => x.Usid == usid).OrderByDescending(x => x.CreateTime).Skip(offset).Take(10).Join(_context.Video, x => x.Vid, y => y.Vid, (x, y) => x);
+
+            string baseUrl = Request.Scheme + "://" + Request.Host + "/";
+
+            bool isLogin = false;
+            int myid = -1;
+            List<int> FList = new List<int>();
+
+            var auth = await HttpContext.AuthenticateAsync();
+            if (auth.Succeeded)
+            {
+                var claim = User.FindFirstValue("User");
+                if (int.TryParse(claim, out myid))
+                    isLogin = true;
+            }
+
+            if (isLogin)
+            {
+                FList = await _context.Follow.Where(x => x.Usid == myid).Select(x => x.FollowUsid).ToListAsync();
+            }
+
+            var result = _context.Users.Join(videos, x => x.Usid, y => y.Usid, (x, y) => new
+            {
+                watch_time = y.CreateTime.ToTimestamp(),
+                video = new
+                {
+                    vid = y.V.Vid,
+                    title = y.V.Title,
+                    cover = baseUrl + "images/" + y.V.Cover,
+                    description = y.V.Description,
+                    path = baseUrl + "videos/" + y.V.Path,
+                    create_time = y.V.CreateTime.ToTimestamp(),
+                    time = y.V.Time,
+                    like_num = y.V.LikeNum,
+                    favorite_num = y.V.FavoriteNum,
+                    watch_num = y.V.WatchNum,
+                    is_banned = y.V.IsBanned,
+                    up = new
+                    {
+                        usid = y.V.Us.Usid,
+                        name = y.V.Us.Nickname,
+                        desc = y.V.Us.Signature,
+                        follow_num = y.V.Us.FollowerNum,
+                        avatar = y.V.Us.Avatar,
+                        ifollow = FList.Contains(y.V.Us.Usid) ? 1 : 0
+                    }
+                }
+            });
+
+            return Ok(new
+            {
+                status = "ok",
+                data = new
+                {
+                    count = _context.Watchhistory.Where(z => z.Usid == usid).Count(),
+                    result
+                }
+            });
         }
 
         // GET: api/Watchhistories

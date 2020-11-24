@@ -6,6 +6,11 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CatjiApi.Models;
+using System.Web;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
+
+
 
 namespace CatjiApi.Controllers
 {
@@ -20,11 +25,115 @@ namespace CatjiApi.Controllers
             _context = context;
         }
 
+        [HttpGet("info")]
+        public async Task<IActionResult> GetLikevideo(int id, int id2)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(ModelState);
+            }
+
+            var likevideo = await _context.Likevideo.FindAsync(id, id2);
+
+            if (likevideo == null)
+            {
+                return NotFound();
+            }
+
+            return Ok();
+        }
+        
         // GET: api/Likevideos
         [HttpGet]
         public IEnumerable<Likevideo> GetLikevideo()
         {
             return _context.Likevideo;
+        }
+        //POST:api/Likevideos/addLikeV
+
+        [HttpPost("addLikeV")]
+        public async Task<IActionResult> addLikeV(Likevideo lv)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { status = "invalid", data = ModelState });
+            }
+
+            var auth = await HttpContext.AuthenticateAsync();
+            if (!auth.Succeeded)
+            {
+                return NotFound(new { status = "not login" });
+            }
+
+            var claim = User.FindFirstValue("User");
+
+            if (!Int32.TryParse(claim, out var loginUsid))
+            {
+                return BadRequest(new { status = "validation failed" });
+            }
+
+            var user = await _context.Users.FindAsync(loginUsid);
+
+            var Likevideos = _context.Likevideo.Where(x => x.Usid== user.Usid && x.Vid==lv.Vid );
+
+            if (Likevideos.Count() != 0)
+                return BadRequest(new { status = "已点赞", data = ModelState });
+
+            var likevideo1 = new Likevideo();
+            likevideo1.Usid = user.Usid;
+            likevideo1.Vid = lv.Vid;
+            try
+            {
+                _context.Likevideo.Add(likevideo1);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException e)
+            {
+                return NotFound(new { status = "Create failed.", data = e.ToString() });
+            }
+
+            return Ok(new { status = "ok", data = new { usid = likevideo1.Usid,vid= likevideo1.Vid } });
+        }
+
+        [HttpPost("UnlikeV")]
+        public async Task<IActionResult> UnlikeV(Likevideo lv)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { status = "invalid", data = ModelState });
+            }
+
+            var auth = await HttpContext.AuthenticateAsync();
+            if (!auth.Succeeded)
+            {
+                return NotFound(new { status = "not login" });
+            }
+
+            var claim = User.FindFirstValue("User");
+
+            if (!Int32.TryParse(claim, out var loginUsid))
+            {
+                return BadRequest(new { status = "validation failed" });
+            }
+
+            var user = await _context.Users.FindAsync(loginUsid);
+
+            var Likevideos = await _context.Likevideo.FirstOrDefaultAsync(x => x.Usid == user.Usid && x.Vid == lv.Vid);
+
+            if (Likevideos == null)
+                return BadRequest(new { status = "未点赞" });
+
+            try
+            {
+                _context.Likevideo.Remove(Likevideos);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException e)
+            {
+                return NotFound(new { status = "Remove failed.", data = e.ToString() });
+            }
+
+            return Ok(new { status = "ok" });
         }
 
         // GET: api/Likevideos/5

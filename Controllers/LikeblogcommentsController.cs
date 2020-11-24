@@ -6,6 +6,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CatjiApi.Models;
+using System.Web;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 
 namespace CatjiApi.Controllers
 {
@@ -44,6 +47,86 @@ namespace CatjiApi.Controllers
             }
 
             return Ok(likeblogcomment);
+        }
+        //POST:api/Likeblogcomments/addLikeBc
+
+        [HttpPost("addLikeBc")]
+        public async Task<IActionResult> addLikeBc(Likeblogcomment Lbc)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { status = "invalid", data = ModelState });
+            }
+            var auth = await HttpContext.AuthenticateAsync();
+            if (!auth.Succeeded)
+            {
+                return NotFound(new { status = "not login" });
+            }
+
+            var claim = User.FindFirstValue("User");
+
+            if (!Int32.TryParse(claim, out var loginUsid))
+            {
+                return BadRequest(new { status = "validation failed" });
+            }
+
+            var user = await _context.Users.FindAsync(loginUsid);
+            var Likeblogcomments = _context.Likeblogcomment.Where(x => x.Usid == user.Usid && x.Bcid == Lbc.Bcid);
+
+            if (Likeblogcomments.Count() != 0)
+                return BadRequest(new { status = "Already liked!" });
+
+            var likeblogcomment0 = new Likeblogcomment();
+            likeblogcomment0.Usid = user.Usid;
+            likeblogcomment0.Bcid = Lbc.Bcid;
+            try
+            {
+                _context.Likeblogcomment.Add(likeblogcomment0);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException e)
+            {
+                return NotFound(new { status = "Create failed.", data = e.ToString() });
+            }
+            return Ok(new { status = "ok", data = new { usid = likeblogcomment0.Usid, vcid = likeblogcomment0.Bcid } });
+        }
+
+        [HttpPost("UnlikeBc")]
+        public async Task<IActionResult> UlikeBc(Likeblogcomment Lbc)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { status = "invalid", data = ModelState });
+            }
+            var auth = await HttpContext.AuthenticateAsync();
+            if (!auth.Succeeded)
+            {
+                return NotFound(new { status = "not login" });
+            }
+
+            var claim = User.FindFirstValue("User");
+
+            if (!Int32.TryParse(claim, out var loginUsid))
+            {
+                return BadRequest(new { status = "validation failed" });
+            }
+
+            var user = await _context.Users.FindAsync(loginUsid);
+            var Likeblogcomments = await _context.Likeblogcomment.FirstOrDefaultAsync(x => x.Usid == user.Usid && x.Bcid == Lbc.Bcid);
+
+            if (Likeblogcomments == null)
+                return BadRequest(new { status = "Not already liked!" });
+
+            try
+            {
+                _context.Likeblogcomment.Remove(Likeblogcomments);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException e)
+            {
+                return NotFound(new { status = "Remove failed.", data = e.ToString() });
+            }
+            return Ok(new { status = "ok" });
         }
 
         // PUT: api/Likeblogcomments/5

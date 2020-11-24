@@ -20,6 +20,19 @@ namespace CatjiApi.Controllers
             _context = context;
         }
 
+        [HttpGet("content")]
+        public async Task<IActionResult> GetSearchhistories(int usid)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { status = "validation failed" });
+            }
+
+            var searchhistory = await _context.Searchhistory.Where(x => x.Usid == usid).OrderByDescending(x => x.CreateTime).Take(10).Select(x => x.Content).ToListAsync();
+
+            return Ok(new { status = "ok", data = searchhistory });
+        }
+
         // GET: api/Searchhistories
         [HttpGet]
         public IEnumerable<Searchhistory> GetSearchhistory()
@@ -130,10 +143,31 @@ namespace CatjiApi.Controllers
 
             return Ok(searchhistory);
         }
+        //Get:api/search/hotlist
+        [HttpGet("hotlist")]
+        public async Task<IActionResult> GetVhotlist()
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { status = "validation failed" });
+            }
+            var Searchhistories_hotlist = await _context.Searchhistory.Select(x => x.Content).Distinct().ToListAsync();
 
+            var list = Tools.RandomList(10, Searchhistories_hotlist.Count());
+
+            List<string> result = new List<string>();
+
+            foreach (var v in list)
+                result.Add(Searchhistories_hotlist[v]);
+
+            return Ok(new { status = "ok", data = result });
+
+        }
         private bool SearchhistoryExists(int id)
         {
             return _context.Searchhistory.Any(e => e.Usid == id);
         }
     }
 }
+
+

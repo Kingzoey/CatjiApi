@@ -6,7 +6,9 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using CatjiApi.Models;
-
+using System.Web;
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authentication;
 namespace CatjiApi.Controllers
 {
     [Route("api/[controller]")]
@@ -26,7 +28,7 @@ namespace CatjiApi.Controllers
         {
             return _context.Likevideocomment;
         }
-
+       
         // GET: api/Likevideocomments/5
         [HttpGet("{id}")]
         public async Task<IActionResult> GetLikevideocomment([FromRoute] int id)
@@ -44,6 +46,86 @@ namespace CatjiApi.Controllers
             }
 
             return Ok(likevideocomment);
+        }
+        //POST:api/Likevideocomments/addLikeVc
+
+        [HttpPost("addLikeVc")]
+        public async Task<IActionResult> addLikeVc(Likevideocomment Lbc)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { status = "invalid", data = ModelState });
+            }
+            var auth = await HttpContext.AuthenticateAsync();
+            if (!auth.Succeeded)
+            {
+                return NotFound(new { status = "not login" });
+            }
+
+            var claim = User.FindFirstValue("User");
+
+            if (!Int32.TryParse(claim, out var loginUsid))
+            {
+                return BadRequest(new { status = "validation failed" });
+            }
+
+            var user = await _context.Users.FindAsync(loginUsid);
+            var Likevideocomments = _context.Likevideocomment.Where(x => x.Usid == user.Usid && x.Vcid == Lbc.Vcid);
+
+            if (Likevideocomments.Count() != 0)
+                return BadRequest(new { status = "Already liked!" });
+
+            var likevideocomment0 = new Likevideocomment();
+            likevideocomment0.Usid = user.Usid;
+            likevideocomment0.Vcid = Lbc.Vcid;
+            try
+            {
+                _context.Likevideocomment.Add(likevideocomment0);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException e)
+            {
+                return NotFound(new { status = "Create failed.", data = e.ToString() });
+            }
+            return Ok(new { status = "ok", data = new { usid = likevideocomment0.Usid, vcid = likevideocomment0.Vcid } });
+        }
+
+        [HttpPost("UnlikeVc")]
+        public async Task<IActionResult> UnikeVc(Likevideocomment Lbc)
+        {
+            if (!ModelState.IsValid)
+            {
+                return BadRequest(new { status = "invalid", data = ModelState });
+            }
+            var auth = await HttpContext.AuthenticateAsync();
+            if (!auth.Succeeded)
+            {
+                return NotFound(new { status = "not login" });
+            }
+
+            var claim = User.FindFirstValue("User");
+
+            if (!Int32.TryParse(claim, out var loginUsid))
+            {
+                return BadRequest(new { status = "validation failed" });
+            }
+
+            var user = await _context.Users.FindAsync(loginUsid);
+            var Likevideocomments = await _context.Likevideocomment.FirstOrDefaultAsync(x => x.Usid == user.Usid && x.Vcid == Lbc.Vcid);
+
+            if (Likevideocomments == null)
+                return BadRequest(new { status = "Not already liked!" });
+
+            try
+            {
+                _context.Likevideocomment.Remove(Likevideocomments);
+                await _context.SaveChangesAsync();
+            }
+            catch (DbUpdateException e)
+            {
+                return NotFound(new { status = "Remove failed.", data = e.ToString() });
+            }
+            return Ok(new { status = "ok" });
         }
 
         // PUT: api/Likevideocomments/5
